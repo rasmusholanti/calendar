@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Paper, Title, Container, Text, Grid, Stack, Badge, Group, SegmentedControl, Center, ThemeIcon, Box, AppShell, ScrollArea, Button, Modal, TextInput, Select as MantineSelect, ActionIcon } from '@mantine/core';
+import { Paper, Title, Container, Text, Grid, Stack, Badge, Group, SegmentedControl, Center, ThemeIcon, AppShell, ScrollArea, Button, Modal, TextInput, Select as MantineSelect, ActionIcon } from '@mantine/core';
 import type { MantineTheme } from '@mantine/core';
 import { DatePicker } from '@mantine/dates';
 import type { DateValue } from '@mantine/dates';
