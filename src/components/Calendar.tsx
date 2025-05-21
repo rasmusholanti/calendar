@@ -1,26 +1,105 @@
 import { useState } from 'react';
-import { Paper, Title, Container, Text, Grid, Stack, Badge, Group, SegmentedControl, Center, ThemeIcon, Box, AppShell, ScrollArea, Button } from '@mantine/core';
+import { Paper, Title, Container, Text, Grid, Stack, Badge, Group, SegmentedControl, Center, ThemeIcon, Box, AppShell, ScrollArea, Button, Modal, TextInput, Select as MantineSelect, ActionIcon } from '@mantine/core';
 import type { MantineTheme } from '@mantine/core';
 import { DatePicker } from '@mantine/dates';
 import type { DateValue } from '@mantine/dates';
-import { IconTruckDelivery, IconPackageExport, IconCalendar, IconHome, IconSettings, IconUsers } from '@tabler/icons-react';
-import type { Order } from './mockData';
-import { mockOrders } from './mockData';
+import { IconTruckDelivery, IconPackageExport, IconCalendar, IconHome, IconSettings, IconUsers, IconEdit, IconTrash } from '@tabler/icons-react';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  setSelectedDate,
+  setViewType,
+  setModalOpen,
+  setEditingOrder,
+  resetEditingOrder,
+  addOrder,
+  updateOrder,
+  deleteOrder
+} from '../store/calendarSlice';
+import type { Order } from '../store/types';
 
-type ViewType = 'all' | 'pickups' | 'deliveries';
+type UserRole = 'admin' | 'seller';
 
 export function CalendarComponent() {
-  const [selectedDate, setSelectedDate] = useState<DateValue>(null);
-  const [viewType, setViewType] = useState<ViewType>('all');
+  const dispatch = useAppDispatch();
+  const {
+    orders,
+    selectedDate,
+    viewType,
+    isModalOpen,
+    editingOrder
+  } = useAppSelector(state => state.calendar);
+  const [userRole] = useState<UserRole>('admin'); // This should come from your auth system
+  const [editingType, setEditingType] = useState<'pickup' | 'delivery'>('delivery');
 
   const handleDateChange = (date: DateValue) => {
     if (!date) {
-      setSelectedDate(null);
+      dispatch(setSelectedDate(null));
       return;
     }
+    // Convert string date to Date object if needed
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    // Convert to ISO string before dispatching
+    dispatch(setSelectedDate(dateObj.toISOString()));
+  };
 
-    // Set the selected date
-    setSelectedDate(date);
+  const handleEditOrder = (order: Order, type: 'pickup' | 'delivery') => {
+    setEditingType(type);
+    dispatch(setEditingOrder(order));
+    dispatch(setModalOpen(true));
+  };
+
+  const handleDeleteOrder = (orderId: string) => {
+    dispatch(deleteOrder(orderId));
+  };
+
+  const handleSaveOrder = (formData: Partial<Order>) => {
+    if (formData.id) {
+      // Ensure all required fields are present for update
+      const completeOrder: Order = {
+        id: formData.id,
+        buyerId: formData.buyerId || '',
+        sellerId: formData.sellerId || '',
+        productId: formData.productId || '',
+        status: formData.status || 'pending',
+        address: formData.address || '',
+        pickupDate: formData.pickupDate,
+        deliveryDate: formData.deliveryDate
+      };
+      dispatch(updateOrder(completeOrder));
+    } else {
+      // Create new order with required fields and selected date
+      const newOrder: Order = {
+        id: `order-${Date.now()}`,
+        buyerId: formData.buyerId || '',
+        sellerId: formData.sellerId || '',
+        productId: formData.productId || '',
+        status: formData.status || 'pending',
+        address: formData.address || '',
+        pickupDate: editingType === 'pickup' && selectedDate ? selectedDate.split('T')[0] : undefined,
+        deliveryDate: editingType === 'delivery' && selectedDate ? selectedDate.split('T')[0] : undefined
+      };
+      dispatch(addOrder(newOrder));
+    }
+    
+    dispatch(setModalOpen(false));
+    dispatch(resetEditingOrder());
+  };
+
+  const handleFormChange = (field: keyof Order, value: string) => {
+    dispatch(setEditingOrder({ [field]: value }));
+  };
+
+  const handleDateChangeForm = (value: DateValue) => {
+    if (value) {
+      const date = new Date(value);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      dispatch(setEditingOrder({
+        ...editingOrder,
+        pickupDate: editingType === 'pickup' ? dateStr : editingOrder.pickupDate,
+        deliveryDate: editingType === 'delivery' ? dateStr : editingOrder.deliveryDate
+      }));
+    }
   };
 
   const getStatusColor = (status: Order['status']) => {
@@ -33,48 +112,9 @@ export function CalendarComponent() {
     }
   };
 
-  // Get all orders for the current day
-  const getOrdersForPeriod = (date: Date) => {
-    const startDate = new Date(date);
-    const endDate = new Date(date);
-
-    // Set time to start and end of day
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-
-    return mockOrders.filter(order => {
-      const orderDate = order.pickupDate || order.deliveryDate;
-      if (!orderDate) return false;
-      
-      const orderDateObj = new Date(orderDate);
-      // Set to midnight for consistent comparison
-      orderDateObj.setHours(0, 0, 0, 0);
-      
-      // Create new Date object for comparison to avoid modifying original
-      const compareStartDate = new Date(startDate);
-      
-      return orderDateObj >= compareStartDate && orderDateObj <= endDate;
-    });
-  };
-
-  // Get events for the current view
-  const getEventsForCurrentView = () => {
-    if (!selectedDate) return { pickups: [], deliveries: [] };
-    
-    const dateObj = typeof selectedDate === 'string' ? new Date(selectedDate) : selectedDate;
-    const orders = getOrdersForPeriod(dateObj);
-    
-    return {
-      pickups: orders.filter(order => order.pickupDate),
-      deliveries: orders.filter(order => order.deliveryDate)
-    };
-  };
-
-  const currentViewEvents = getEventsForCurrentView();
-
   const hasPickupOnDate = (date: Date | string) => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return mockOrders.some(order => {
+    return orders.some(order => {
       if (!order.pickupDate) return false;
       const pickupDate = new Date(order.pickupDate);
       return (
@@ -85,19 +125,53 @@ export function CalendarComponent() {
     });
   };
 
+  const getOrdersForPeriod = (date: Date) => {
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+
+    return orders.filter(order => {
+      const orderDate = order.pickupDate || order.deliveryDate;
+      if (!orderDate) return false;
+      
+      const orderDateObj = new Date(orderDate);
+      orderDateObj.setHours(0, 0, 0, 0);
+      
+      const compareStartDate = new Date(startDate);
+      
+      return orderDateObj >= compareStartDate && orderDateObj <= endDate;
+    });
+  };
+
+  const getEventsForCurrentView = () => {
+    if (!selectedDate) return { pickups: [], deliveries: [] };
+    
+    const dateObj = new Date(selectedDate);
+    const orders = getOrdersForPeriod(dateObj);
+    
+    return {
+      pickups: orders.filter(order => order.pickupDate),
+      deliveries: orders.filter(order => order.deliveryDate)
+    };
+  };
+
+  const currentViewEvents = getEventsForCurrentView();
+
   return (
-    <Box style={{ minHeight: '100vh', display: 'flex' }}>
-      <AppShell.Navbar 
-        p="md" 
-        w={300} 
-        h="calc(100vh - 120px)" 
-        style={{ 
-          position: 'fixed', 
-          left: 0, 
-          top: 60,
-          borderRight: '1px solid var(--mantine-color-gray-3)'
-        }}
-      >
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{ width: 300, breakpoint: 'sm' }}
+      padding="md"
+    >
+      <AppShell.Header>
+        <Group h="100%" px="md">
+          <Title order={3}>Calendar</Title>
+        </Group>
+      </AppShell.Header>
+
+      <AppShell.Navbar p="md">
         <AppShell.Section grow component={ScrollArea}>
           <Stack gap="xs">
             <Button variant="light" leftSection={<IconHome size={20} />} fullWidth justify="flex-start">
@@ -125,13 +199,13 @@ export function CalendarComponent() {
         </AppShell.Section>
       </AppShell.Navbar>
 
-      <Box style={{ marginLeft: 300, flex: 1, padding: '1rem' }}>
+      <AppShell.Main>
         <Container size="lg">
           <Center mb="xl">
             <Group>
               <SegmentedControl
                 value={viewType}
-                onChange={(value) => setViewType(value as ViewType)}
+                onChange={(value) => dispatch(setViewType(value as 'all' | 'pickups' | 'deliveries'))}
                 data={[
                   { label: 'All', value: 'all' },
                   { label: 'Pick-Ups', value: 'pickups' },
@@ -139,6 +213,14 @@ export function CalendarComponent() {
                 ]}
                 size="md"
               />
+              {(userRole === 'admin' || userRole === 'seller') && (
+                <Button onClick={() => {
+                  dispatch(resetEditingOrder());
+                  dispatch(setModalOpen(true));
+                }}>
+                  Add New Event
+                </Button>
+              )}
             </Group>
           </Center>
           <Grid>
@@ -156,7 +238,7 @@ export function CalendarComponent() {
                     minWidth: '200px'
                   }}>
                     <DatePicker
-                      value={selectedDate}
+                      value={selectedDate ? new Date(selectedDate) : null}
                       onChange={(date) => {
                         console.log('DatePicker onChange triggered with:', date);
                         if (date) {
@@ -199,14 +281,14 @@ export function CalendarComponent() {
                           }
                           
                           return {
-                            fontSize: '1.1rem',
-                            height: '2.5rem',
+                          fontSize: '1.1rem',
+                          height: '2.5rem',
                             ...(isSelected && {
-                              backgroundColor: 'var(--mantine-color-blue-6)',
-                              color: 'white',
-                              '&:hover': {
-                                backgroundColor: 'var(--mantine-color-blue-7)'
-                              }
+                            backgroundColor: 'var(--mantine-color-blue-6)',
+                            color: 'white',
+                            '&:hover': {
+                              backgroundColor: 'var(--mantine-color-blue-7)'
+                            }
                             })
                           };
                         },
@@ -235,9 +317,21 @@ export function CalendarComponent() {
                                     <ThemeIcon color="green" variant="light"><IconPackageExport size={20} /></ThemeIcon>
                                     <Text fw={500}>Order #{order.id}</Text>
                                   </Group>
+                                  <Group>
                                   <Badge color={getStatusColor(order.status)}>
                                     {order.status}
                                   </Badge>
+                                    {(userRole === 'admin' || userRole === 'seller') && (
+                                      <Group gap="xs">
+                                        <ActionIcon variant="subtle" color="blue" onClick={() => handleEditOrder(order, 'pickup')}>
+                                          <IconEdit size={16} />
+                                        </ActionIcon>
+                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteOrder(order.id)}>
+                                          <IconTrash size={16} />
+                                        </ActionIcon>
+                                      </Group>
+                                    )}
+                                  </Group>
                                 </Group>
                                 <Text size="sm" c="dimmed">Pickup Date: {order.pickupDate}</Text>
                                 <Text size="sm" c="dimmed">Buyer: {order.buyerId}</Text>
@@ -263,9 +357,21 @@ export function CalendarComponent() {
                                     <ThemeIcon color="blue" variant="light"><IconTruckDelivery size={20} /></ThemeIcon>
                                     <Text fw={500}>Order #{order.id}</Text>
                                   </Group>
+                                  <Group>
                                   <Badge color={getStatusColor(order.status)}>
                                     {order.status}
                                   </Badge>
+                                    {(userRole === 'admin' || userRole === 'seller') && (
+                                      <Group gap="xs">
+                                        <ActionIcon variant="subtle" color="blue" onClick={() => handleEditOrder(order, 'delivery')}>
+                                          <IconEdit size={16} />
+                                        </ActionIcon>
+                                        <ActionIcon variant="subtle" color="red" onClick={() => handleDeleteOrder(order.id)}>
+                                          <IconTrash size={16} />
+                                        </ActionIcon>
+                                      </Group>
+                                    )}
+                                  </Group>
                                 </Group>
                                 <Text size="sm" c="dimmed">Delivery Date: {order.deliveryDate}</Text>
                                 <Text size="sm" c="dimmed">Buyer: {order.buyerId}</Text>
@@ -292,7 +398,91 @@ export function CalendarComponent() {
             </Grid.Col>
           </Grid>
         </Container>
-      </Box>
-    </Box>
+      </AppShell.Main>
+
+      <Modal
+        opened={isModalOpen}
+        onClose={() => {
+          dispatch(setModalOpen(false));
+          dispatch(resetEditingOrder());
+          setEditingType('delivery');
+        }}
+        title={editingOrder.id ? "Edit Event" : "Add New Event"}
+        size="lg"
+      >
+        <Stack>
+          <MantineSelect
+            label="Event Type"
+            placeholder="Select event type"
+            data={[
+              { value: 'pickup', label: 'Pickup' },
+              { value: 'delivery', label: 'Delivery' }
+            ]}
+            value={editingType}
+            onChange={(value) => {
+              setEditingType(value as 'pickup' | 'delivery');
+              dispatch(setEditingOrder({
+                ...editingOrder,
+                pickupDate: editingOrder.pickupDate,
+                deliveryDate: editingOrder.deliveryDate
+              }));
+            }}
+          />
+          {editingOrder.id && (
+            <DatePicker
+              value={editingOrder.pickupDate || editingOrder.deliveryDate}
+              onChange={handleDateChangeForm}
+            />
+          )}
+          <TextInput
+            label="Buyer ID"
+            placeholder="Enter buyer ID"
+            value={editingOrder.buyerId}
+            onChange={(e) => handleFormChange('buyerId', e.target.value)}
+          />
+          <TextInput
+            label="Seller ID"
+            placeholder="Enter seller ID"
+            value={editingOrder.sellerId}
+            onChange={(e) => handleFormChange('sellerId', e.target.value)}
+          />
+          <TextInput
+            label="Product ID"
+            placeholder="Enter product ID"
+            value={editingOrder.productId}
+            onChange={(e) => handleFormChange('productId', e.target.value)}
+          />
+          <TextInput
+            label="Address"
+            placeholder="Enter address"
+            value={editingOrder.address}
+            onChange={(e) => handleFormChange('address', e.target.value)}
+          />
+          <MantineSelect
+            label="Status"
+            placeholder="Select status"
+            data={[
+              { value: 'pending', label: 'Pending' },
+              { value: 'confirmed', label: 'Confirmed' },
+              { value: 'scheduled', label: 'Scheduled' },
+              { value: 'delivered', label: 'Delivered' }
+            ]}
+            value={editingOrder.status}
+            onChange={(value) => handleFormChange('status', value as Order['status'])}
+          />
+          <Group justify="flex-end" mt="md">
+            <Button variant="outline" onClick={() => {
+              dispatch(setModalOpen(false));
+              dispatch(resetEditingOrder());
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={() => handleSaveOrder(editingOrder)}>
+              Save
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+    </AppShell>
   );
 } 
