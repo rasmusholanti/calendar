@@ -1,0 +1,298 @@
+import { useState } from 'react';
+import { Paper, Title, Container, Text, Grid, Stack, Badge, Group, SegmentedControl, Center, ThemeIcon, Box, AppShell, ScrollArea, Button } from '@mantine/core';
+import type { MantineTheme } from '@mantine/core';
+import { DatePicker } from '@mantine/dates';
+import type { DateValue } from '@mantine/dates';
+import { IconTruckDelivery, IconPackageExport, IconCalendar, IconHome, IconSettings, IconUsers } from '@tabler/icons-react';
+import type { Order } from './mockData';
+import { mockOrders } from './mockData';
+
+type ViewType = 'all' | 'pickups' | 'deliveries';
+
+export function CalendarComponent() {
+  const [selectedDate, setSelectedDate] = useState<DateValue>(null);
+  const [viewType, setViewType] = useState<ViewType>('all');
+
+  const handleDateChange = (date: DateValue) => {
+    if (!date) {
+      setSelectedDate(null);
+      return;
+    }
+
+    // Set the selected date
+    setSelectedDate(date);
+  };
+
+  const getStatusColor = (status: Order['status']) => {
+    switch (status) {
+      case 'pending': return 'yellow';
+      case 'confirmed': return 'blue';
+      case 'scheduled': return 'green';
+      case 'delivered': return 'gray';
+      default: return 'gray';
+    }
+  };
+
+  // Get all orders for the current day
+  const getOrdersForPeriod = (date: Date) => {
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+
+    // Set time to start and end of day
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    return mockOrders.filter(order => {
+      const orderDate = order.pickupDate || order.deliveryDate;
+      if (!orderDate) return false;
+      
+      const orderDateObj = new Date(orderDate);
+      // Set to midnight for consistent comparison
+      orderDateObj.setHours(0, 0, 0, 0);
+      
+      // Create new Date object for comparison to avoid modifying original
+      const compareStartDate = new Date(startDate);
+      
+      return orderDateObj >= compareStartDate && orderDateObj <= endDate;
+    });
+  };
+
+  // Get events for the current view
+  const getEventsForCurrentView = () => {
+    if (!selectedDate) return { pickups: [], deliveries: [] };
+    
+    const dateObj = typeof selectedDate === 'string' ? new Date(selectedDate) : selectedDate;
+    const orders = getOrdersForPeriod(dateObj);
+    
+    return {
+      pickups: orders.filter(order => order.pickupDate),
+      deliveries: orders.filter(order => order.deliveryDate)
+    };
+  };
+
+  const currentViewEvents = getEventsForCurrentView();
+
+  const hasPickupOnDate = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return mockOrders.some(order => {
+      if (!order.pickupDate) return false;
+      const pickupDate = new Date(order.pickupDate);
+      return (
+        pickupDate.getFullYear() === dateObj.getFullYear() &&
+        pickupDate.getMonth() === dateObj.getMonth() &&
+        pickupDate.getDate() === dateObj.getDate()
+      );
+    });
+  };
+
+  return (
+    <Box style={{ minHeight: '100vh', display: 'flex' }}>
+      <AppShell.Navbar 
+        p="md" 
+        w={300} 
+        h="calc(100vh - 120px)" 
+        style={{ 
+          position: 'fixed', 
+          left: 0, 
+          top: 60,
+          borderRight: '1px solid var(--mantine-color-gray-3)'
+        }}
+      >
+        <AppShell.Section grow component={ScrollArea}>
+          <Stack gap="xs">
+            <Button variant="light" leftSection={<IconHome size={20} />} fullWidth justify="flex-start">
+              Dashboard
+            </Button>
+            <Button variant="light" leftSection={<IconCalendar size={20} />} fullWidth justify="flex-start">
+              Calendar
+            </Button>
+            <Button variant="light" leftSection={<IconTruckDelivery size={20} />} fullWidth justify="flex-start">
+              Deliveries
+            </Button>
+            <Button variant="light" leftSection={<IconPackageExport size={20} />} fullWidth justify="flex-start">
+              Pickups
+            </Button>
+            <Button variant="light" leftSection={<IconUsers size={20} />} fullWidth justify="flex-start">
+              Customers
+            </Button>
+          </Stack>
+        </AppShell.Section>
+
+        <AppShell.Section>
+          <Button variant="light" leftSection={<IconSettings size={20} />} fullWidth justify="flex-start">
+            Settings
+          </Button>
+        </AppShell.Section>
+      </AppShell.Navbar>
+
+      <Box style={{ marginLeft: 300, flex: 1, padding: '1rem' }}>
+        <Container size="lg">
+          <Center mb="xl">
+            <Group>
+              <SegmentedControl
+                value={viewType}
+                onChange={(value) => setViewType(value as ViewType)}
+                data={[
+                  { label: 'All', value: 'all' },
+                  { label: 'Pick-Ups', value: 'pickups' },
+                  { label: 'Deliveries', value: 'deliveries' },
+                ]}
+                size="md"
+              />
+            </Group>
+          </Center>
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Paper shadow="sm" p="xl" withBorder>
+                <Title order={2} mb="md">Calendar</Title>
+                <div style={{ 
+                  padding: '1.5rem 2.0rem',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{ 
+                    width: '100%',
+                    maxWidth: '400px',
+                    minWidth: '200px'
+                  }}>
+                    <DatePicker
+                      value={selectedDate}
+                      onChange={(date) => {
+                        console.log('DatePicker onChange triggered with:', date);
+                        if (date) {
+                          console.log('Date is valid, calling handleDateChange');
+                          handleDateChange(date);
+                        }
+                      }}
+                      size="xl"
+                      getDayProps={(date) => {
+                        const isPickup = hasPickupOnDate(date);
+                        return {
+                          style: {
+                            backgroundColor: isPickup ? '#e6fff2' : 'transparent',
+                            color: isPickup ? '#20c997' : 'inherit',
+                            fontWeight: isPickup ? 500 : 'normal',
+                            border: isPickup ? '1px solid #20c997' : 'none',
+                          }
+                        };
+                      }}
+                      styles={{
+                        calendarHeader: {
+                          marginBottom: '1rem'
+                        },
+                        day: (_: MantineTheme, params: { selected: boolean; date: Date }) => {
+                          const isSelected = params.selected;
+                          const isPickup = hasPickupOnDate(params.date);
+                          
+                          if (isPickup) {
+                            return {
+                              fontSize: '1.1rem',
+                              height: '2.5rem',
+                              backgroundColor: isSelected ? '#38d996' : '#e6fff2',
+                              color: isSelected ? 'white' : '#20c997',
+                              fontWeight: isSelected ? 700 : 500,
+                              border: isSelected ? '2px solid #20c997' : '1px solid #20c997',
+                              '&:hover': {
+                                backgroundColor: isSelected ? '#20c997' : '#d4f8e8',
+                              },
+                            };
+                          }
+                          
+                          return {
+                            fontSize: '1.1rem',
+                            height: '2.5rem',
+                            ...(isSelected && {
+                              backgroundColor: 'var(--mantine-color-blue-6)',
+                              color: 'white',
+                              '&:hover': {
+                                backgroundColor: 'var(--mantine-color-blue-7)'
+                              }
+                            })
+                          };
+                        },
+                      }}
+                    />
+                  </div>
+                </div>
+              </Paper>
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Paper shadow="sm" p="xl" withBorder h="100%">
+                <Title order={2} mb="md">Schedule Details</Title>
+                <div style={{ padding: '1.5rem 2.5rem' }}>
+                  {selectedDate ? (
+                    <Stack gap="xl">
+                      {(viewType === 'all' || viewType === 'pickups') && currentViewEvents.pickups.length > 0 && (
+                        <div>
+                          <Title order={3} mb="md" c="green.7">
+                            <Group gap={6}><ThemeIcon color="green" variant="light" size="sm"><IconPackageExport size={16} /></ThemeIcon>Pickups</Group>
+                          </Title>
+                          <Stack gap="md">
+                            {currentViewEvents.pickups.map(order => (
+                              <Paper key={order.id} p="md" withBorder radius="md" style={{ background: '#f0fff4', borderColor: '#b7f5c5' }}>
+                                <Group justify="space-between" mb="xs">
+                                  <Group>
+                                    <ThemeIcon color="green" variant="light"><IconPackageExport size={20} /></ThemeIcon>
+                                    <Text fw={500}>Order #{order.id}</Text>
+                                  </Group>
+                                  <Badge color={getStatusColor(order.status)}>
+                                    {order.status}
+                                  </Badge>
+                                </Group>
+                                <Text size="sm" c="dimmed">Pickup Date: {order.pickupDate}</Text>
+                                <Text size="sm" c="dimmed">Buyer: {order.buyerId}</Text>
+                                <Text size="sm" c="dimmed">Seller: {order.sellerId}</Text>
+                                <Text size="sm" c="dimmed">Product: {order.productId}</Text>
+                                <Text size="sm" c="dimmed">Address: {order.address}</Text>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        </div>
+                      )}
+
+                      {(viewType === 'all' || viewType === 'deliveries') && currentViewEvents.deliveries.length > 0 && (
+                        <div>
+                          <Title order={3} mb="md" c="blue.7">
+                            <Group gap={6}><ThemeIcon color="blue" variant="light" size="sm"><IconTruckDelivery size={16} /></ThemeIcon>Deliveries</Group>
+                          </Title>
+                          <Stack gap="md">
+                            {currentViewEvents.deliveries.map(order => (
+                              <Paper key={order.id} p="md" withBorder radius="md" style={{ background: '#e7f5ff', borderColor: '#a5d8ff' }}>
+                                <Group justify="space-between" mb="xs">
+                                  <Group>
+                                    <ThemeIcon color="blue" variant="light"><IconTruckDelivery size={20} /></ThemeIcon>
+                                    <Text fw={500}>Order #{order.id}</Text>
+                                  </Group>
+                                  <Badge color={getStatusColor(order.status)}>
+                                    {order.status}
+                                  </Badge>
+                                </Group>
+                                <Text size="sm" c="dimmed">Delivery Date: {order.deliveryDate}</Text>
+                                <Text size="sm" c="dimmed">Buyer: {order.buyerId}</Text>
+                                <Text size="sm" c="dimmed">Seller: {order.sellerId}</Text>
+                                <Text size="sm" c="dimmed">Product: {order.productId}</Text>
+                                <Text size="sm" c="dimmed">Address: {order.address}</Text>
+                              </Paper>
+                            ))}
+                          </Stack>
+                        </div>
+                      )}
+
+                      {((viewType === 'all' && currentViewEvents.pickups.length === 0 && currentViewEvents.deliveries.length === 0) ||
+                        (viewType === 'pickups' && currentViewEvents.pickups.length === 0) ||
+                        (viewType === 'deliveries' && currentViewEvents.deliveries.length === 0)) && (
+                        <Text c="dimmed">No scheduled events for this day</Text>
+                      )}
+                    </Stack>
+                  ) : (
+                    <Text c="dimmed">Select a date to see schedule details</Text>
+                  )}
+                </div>
+              </Paper>
+            </Grid.Col>
+          </Grid>
+        </Container>
+      </Box>
+    </Box>
+  );
+} 
