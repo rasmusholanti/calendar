@@ -1,25 +1,14 @@
 # Calendar Application
 
-A modern calendar application built with React, TypeScript, and Mantine UI for managing pickups and deliveries.
-
-## Live Demo
-
-The application is deployed and available at: [calendar-mauve-eta.vercel.app](https://calendar-mauve-eta.vercel.app)
+A React-based calendar application for managing deliveries and pickups. This application allows users to schedule, edit, and track delivery and pickup events.
 
 ## Features
 
-- 📅 Interactive calendar interface
-- 📦 Pickup and delivery management
-- 🔍 Filter views (All, Pickups, Deliveries)
-- 🎯 Easy date selection and event viewing
-
-## Tech Stack
-
-- React
-- TypeScript
-- Mantine UI v8
-- Vite
-- Tabler Icons
+- **Calendar View**: Visual calendar interface showing scheduled events
+- **Event Management**: Add, edit, and delete delivery and pickup events
+- **Role-Based Access**: Different permissions for admin and seller roles
+- **Event Filtering**: Filter events by type (All, Pickups, Deliveries)
+- **Date Selection**: Easy date selection for scheduling events
 
 ## Getting Started
 
@@ -30,52 +19,159 @@ The application is deployed and available at: [calendar-mauve-eta.vercel.app](ht
 
 ### Installation
 
-1. Install dependencies:
+1. Clone the repository
+2. Install dependencies:
 ```bash
 npm install
 # or
 yarn install
 ```
-
-2. Start the development server:
+3. Start the development server:
 ```bash
-npm run dev
+npm start
 # or
-yarn dev
+yarn start
 ```
 
-3. Open your browser and navigate to `http://localhost:5173`
+## How to Use
 
-## Project Structure
+### Viewing Events
 
+1. **Select a Date**: Click on any date in the calendar to view events for that day
+2. **Filter Events**: Use the segmented control at the top to filter between:
+   - All Events
+   - Pickups Only
+   - Deliveries Only
+
+### Adding New Events
+
+1. Select a date on the calendar
+2. Click the "Add New Event" button
+3. In the modal:
+   - Select event type (Pickup or Delivery)
+   - Enter Buyer ID
+   - Enter Seller ID
+   - Enter Product ID
+   - Enter Address
+   - Select Status
+4. Click "Save" to create the event
+
+### Editing Events
+
+1. Find the event you want to edit
+2. Click the edit (pencil) icon
+3. Modify the event details in the modal
+4. Click "Save" to update the event
+
+### Deleting Events
+
+1. Find the event you want to delete
+2. Click the delete (trash) icon
+3. Confirm the deletion
+
+### Event Types
+
+#### Pickup Events
+- Represented by green cards
+- Show pickup date and details
+- Can be edited or deleted by admin/seller
+
+#### Delivery Events
+- Represented by blue cards
+- Show delivery date and details
+- Can be edited or deleted by admin/seller
+
+### Event Statuses
+
+- **Pending**: Initial state of new events
+- **Confirmed**: Event has been confirmed
+- **Scheduled**: Event is scheduled
+- **Delivered**: Event has been completed
+
+## User Roles
+
+### Admin
+- Can add new events
+- Can edit all events
+- Can delete events
+- Full access to all features
+
+### Seller
+- Can add new events
+- Can edit their own events
+- Can delete their own events
+- Limited access to certain features
+
+## Technical Details
+
+### State Management
+- Uses Redux for state management
+- Calendar state includes:
+  - Selected date
+  - View type
+  - Events list
+  - Modal state
+
+### Components
+- `CalendarComponent`: Main calendar interface
+- `AppShell`: Layout structure
+- `Modal`: Event creation/editing form
+- `DatePicker`: Date selection component
+
+### Data Structure
+
+```typescript
+interface Order {
+  id: string;
+  buyerId: string;
+  sellerId: string;
+  productId: string;
+  status: 'pending' | 'confirmed' | 'scheduled' | 'delivered';
+  address: string;
+  pickupDate?: string;
+  deliveryDate?: string;
+}
 ```
-src/
-├── components/
-│   ├── Calendar.tsx      # Main calendar component
-    ├── Footer.tsx        # Page Footer 
-    ├── Header.tsx        # Page Header 
-│   └── mockData.ts       # Mock data for development
-├── App.tsx              # Root component
-└── main.tsx            # Entry point
-```
 
-## Usage
+## Best Practices
 
-### Calendar View
-- Click on any date to view scheduled events
-- Use the segmented control to filter between All, Pickups, and Deliveries
-- View detailed information about each pickup and delivery
+1. **Date Selection**:
+   - Always select a date before adding a new event
+   - The selected date will automatically be used for the new event
 
-### Available Scripts
+2. **Event Management**:
+   - Use the filter controls to find specific events
+   - Edit events to update their status as they progress
+   - Delete events only when necessary
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-- `npm run type-check` - Run TypeScript type checking
+3. **Role Usage**:
+   - Admins should use their privileges responsibly
+   - Sellers should only modify their own events
 
-## Acknowledgments
+## Troubleshooting
 
-- Mantine UI for the component library
-- Tabler Icons for the icon set
-- Vite for the build tooling
+### Common Issues
+
+1. **Event Not Showing**:
+   - Check if the correct date is selected
+   - Verify the event type filter is set correctly
+
+2. **Cannot Edit Event**:
+   - Verify your user role has edit permissions
+   - Check if you're the seller of the event
+
+3. **Date Selection Issues**:
+   - Ensure you're clicking on a valid date
+   - Check if the date is within the allowed range
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License.
